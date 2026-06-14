@@ -1,2 +1,10 @@
-# Clean-city---Smart-Waste-Management-system-
-A smart waste management web application that enables citizens to report garbage locations, monitor waste collection activities, optimize collection routes, and track real-time notifications through an interactive dashboard
+
+CleanCity is a web-based waste management system designed to improve urban cleanliness. It allows users to report garbage locations, view reports on a dashboard, optimize collection routes, and manage notifications efficiently.
+
+•Project Features
+•Interactive dashboard with waste •statistics
+•Garbage reporting system
+•Live map visualization
+•Route optimization for collection trucks
+•Report management and status tracking
+•Notification management system
