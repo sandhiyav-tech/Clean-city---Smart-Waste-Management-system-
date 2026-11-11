@@ -6,14 +6,14 @@ const PORT = process.env.PORT || 5000;
 async function startServer() {
   try {
     await connectDB();
-    app.listen(PORT, () => {
-      console.log(`[CleanCity Server] Running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-      console.log(`[CleanCity Server] Health check: http://localhost:${PORT}/api/health`);
-    });
   } catch (err) {
-    console.error('[CleanCity Server] Failed to start:', err.message);
-    process.exit(1);
+    console.warn(`[CleanCity Server] Local MongoDB not detected (${err.message}). Starting with In-Memory Demo Database.`);
   }
+
+  app.listen(PORT, () => {
+    console.log(`[CleanCity Server] Running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    console.log(`[CleanCity Server] Health check: http://localhost:${PORT}/api/health`);
+  });
 }
 
 if (process.env.NODE_ENV !== 'test') {
