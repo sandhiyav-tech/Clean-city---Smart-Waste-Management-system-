@@ -7,7 +7,11 @@ if (!cached) {
 }
 
 async function connectDB() {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/cleancity';
+  const uri =
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URL ||
+    process.env.MONGODB_URL ||
+    'mongodb://127.0.0.1:27017/cleancity';
 
   if (cached.conn) {
     return cached.conn;
