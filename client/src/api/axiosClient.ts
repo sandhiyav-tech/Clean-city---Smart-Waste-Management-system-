@@ -8,6 +8,18 @@ const axiosClient = axios.create({
   },
 });
 
+// Request interceptor to attach JWT token from localStorage if present
+axiosClient.interceptors.request.use(
+  (config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('cleancity_token') : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Interceptor to handle unauthenticated redirect or refresh if necessary
 axiosClient.interceptors.response.use(
   (response) => response,

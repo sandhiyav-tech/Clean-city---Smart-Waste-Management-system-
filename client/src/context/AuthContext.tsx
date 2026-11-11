@@ -15,7 +15,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('cleancity_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState<boolean>(true);
 
   const refreshUser = useCallback(async () => {
@@ -23,11 +30,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await axiosClient.get('/auth/me');
       if (res.data?.success && res.data.data?.user) {
         setUser(res.data.data.user);
+        localStorage.setItem('cleancity_user', JSON.stringify(res.data.data.user));
       } else {
+        localStorage.removeItem('cleancity_token');
+        localStorage.removeItem('cleancity_user');
         setUser(null);
       }
     } catch {
-      setUser(null);
+      // If network/offline or token expired, keep cached user temporarily or clear if 401
+      const token = localStorage.getItem('cleancity_token');
+      if (!token) {
+        setUser(null);
+        localStorage.removeItem('cleancity_user');
+      }
     } finally {
       setLoading(false);
     }
@@ -40,6 +55,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (credentials: { email: string; password: string }): Promise<User> => {
     const res = await axiosClient.post('/auth/login', credentials);
     const loggedUser = res.data.data.user;
+    const token = res.data.data.token;
+    if (token) {
+      localStorage.setItem('cleancity_token', token);
+      localStorage.setItem('cleancity_user', JSON.stringify(loggedUser));
+    }
     setUser(loggedUser);
     return loggedUser;
   };
@@ -53,6 +73,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }): Promise<User> => {
     const res = await axiosClient.post('/auth/signup', userData);
     const newUser = res.data.data.user;
+    const token = res.data.data.token;
+    if (token) {
+      localStorage.setItem('cleancity_token', token);
+      localStorage.setItem('cleancity_user', JSON.stringify(newUser));
+    }
     setUser(newUser);
     return newUser;
   };
@@ -63,6 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Logout failed on server:', e);
     } finally {
+      localStorage.removeItem('cleancity_token');
+      localStorage.removeItem('cleancity_user');
       setUser(null);
       window.location.href = '/login';
     }
