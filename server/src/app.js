@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const connectDB = require('./config/db');
 const routes = require('./routes');
+const demoRouter = require('./mock/demoStore');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -47,32 +48,47 @@ app.use(cookieParser());
 
 // Health check endpoint (always responds even if DB is connecting)
 app.get('/api/health', (req, res) => {
-  const isDbConnected = require('mongoose').connection.readyState === 1;
+  const isConnected = require('mongoose').connection.readyState === 1;
   res.status(200).json({
     success: true,
     status: 'healthy',
     backend: 'Express Serverless Function Active',
-    database: isDbConnected ? 'connected' : 'waiting for MONGODB_URI in Vercel settings',
+    mode: isConnected ? 'MongoDB Cloud Database (Connected)' : 'In-Memory Demo Database (Zero-Setup Active)',
+    database: isConnected ? 'connected' : 'in-memory-fallback',
     timestamp: new Date().toISOString(),
   });
 });
 
-// Serverless DB connection middleware: ensure cached DB connection is active before processing requests
+// Serverless DB connection middleware: attempts to connect to MongoDB, with seamless fallback to In-Memory Demo Database
 app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    console.error('[DB Middleware Error]:', err.message);
-    res.status(503).json({
-      success: false,
-      message: 'Database connection currently unavailable. Please verify MONGODB_URI.',
-    });
+  if (require('mongoose').connection.readyState === 1) {
+    return next();
   }
+
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URL || '';
+  const isPlaceholder = !uri || uri.includes('cluster0.demo.mongodb.net') || uri.includes('127.0.0.1');
+
+  if (!isPlaceholder) {
+    try {
+      await connectDB();
+      return next();
+    } catch (err) {
+      console.warn('[MongoDB Notice]: Real MongoDB not reachable (' + err.message + '). Seamlessly using In-Memory Demo Store.');
+    }
+  }
+
+  // Fallback to In-Memory Demo Store so app always works out of the box
+  req.useDemoFallback = true;
+  next();
 });
 
-// API Routes
-app.use('/api', routes);
+// API Routes (Real MongoDB) or Demo Router (Fallback)
+app.use('/api', (req, res, next) => {
+  if (req.useDemoFallback) {
+    return demoRouter(req, res, next);
+  }
+  return routes(req, res, next);
+});
 
 // 404 for unmatched /api routes
 app.use('/api/*', (req, res) => {
