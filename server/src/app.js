@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const path = require('path');
 const connectDB = require('./config/db');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
@@ -66,6 +67,17 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     message: `API endpoint ${req.originalUrl} not found`,
+  });
+});
+
+// Serve frontend static files from client/dist (for Render, Railway, Docker, & standalone production)
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
+app.get('*', (req, res, next) => {
+  if (req.originalUrl.startsWith('/api')) return next();
+  res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+    if (err) next();
   });
 });
 
