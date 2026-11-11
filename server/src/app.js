@@ -45,6 +45,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Health check endpoint (always responds even if DB is connecting)
+app.get('/api/health', (req, res) => {
+  const isDbConnected = require('mongoose').connection.readyState === 1;
+  res.status(200).json({
+    success: true,
+    status: 'healthy',
+    backend: 'Express Serverless Function Active',
+    database: isDbConnected ? 'connected' : 'waiting for MONGODB_URI in Vercel settings',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Serverless DB connection middleware: ensure cached DB connection is active before processing requests
 app.use(async (req, res, next) => {
   try {
