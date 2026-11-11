@@ -504,10 +504,16 @@ router.get('/stats', (req, res) => {
     success: true,
     data: {
       totalReports: DEMO_REPORTS.length,
+      statusBreakdown: statusMap,
+      wasteTypeBreakdown: wasteTypeMap,
       statusMap,
       wasteTypeMap,
       avgCollectionHours: 3.8,
       reportsPerDay: Object.values(dailyReportsMap),
+      users: {
+        total: DEMO_USERS.length,
+        byRole: usersByRole,
+      },
       usersByRole,
       totalUsers: DEMO_USERS.length,
     },
@@ -562,6 +568,12 @@ router.get('/reports', (req, res) => {
       total: filtered.length,
       page: pageNum,
       totalPages: Math.ceil(filtered.length / limitNum) || 1,
+      pagination: {
+        total: filtered.length,
+        page: pageNum,
+        pages: Math.ceil(filtered.length / limitNum) || 1,
+        limit: limitNum,
+      },
     },
   });
 });
@@ -718,8 +730,34 @@ router.post('/routes/optimize', requireDemoAuth, (req, res) => {
 // USER MANAGEMENT ENDPOINTS
 // -------------------------------------------------------------
 router.get('/users', requireDemoAuth, (req, res) => {
-  const safeUsers = DEMO_USERS.map(({ passwordHash, ...u }) => u);
-  return res.status(200).json({ success: true, data: { users: safeUsers } });
+  const { role, search, page = 1, limit = 15 } = req.query;
+  let filtered = DEMO_USERS.map(({ passwordHash, ...u }) => u);
+
+  if (role && role !== 'ALL') {
+    filtered = filtered.filter((u) => u.role === role);
+  }
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }
+
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = parseInt(limit, 10) || 15;
+  const paginated = filtered.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      users: paginated,
+      total: filtered.length,
+      pagination: {
+        total: filtered.length,
+        page: pageNum,
+        pages: Math.ceil(filtered.length / limitNum) || 1,
+        limit: limitNum,
+      },
+    },
+  });
 });
 
 router.get('/users/drivers', (req, res) => {
@@ -747,6 +785,7 @@ router.post('/users/broadcast', requireDemoAuth, (req, res) => {
       title: title || 'City Notice',
       message: message || '',
       type: 'BROADCAST',
+      isRead: false,
       read: false,
       createdAt: new Date(),
     });
@@ -762,22 +801,48 @@ router.get('/notifications', requireDemoAuth, (req, res) => {
   return res.status(200).json({
     success: true,
     data: {
-      notifications: userNotifs,
-      unreadCount: userNotifs.filter((n) => !n.read).length,
+      notifications: userNotifs.map((n) => ({ ...n, isRead: n.isRead ?? n.read ?? false })),
+      unreadCount: userNotifs.filter((n) => !n.isRead && !n.read).length,
     },
+  });
+});
+
+router.post('/notifications', requireDemoAuth, (req, res) => {
+  const { message, targetRole = 'ALL', type = 'BROADCAST', title } = req.body;
+  const notif = {
+    _id: `64c00000000000000000${String(DEMO_NOTIFICATIONS.length + 1).padStart(4, '0')}`,
+    user: null,
+    title: title || 'City Notice',
+    message: message || '',
+    type,
+    isRead: false,
+    read: false,
+    createdAt: new Date(),
+  };
+  DEMO_NOTIFICATIONS.unshift(notif);
+  return res.status(201).json({
+    success: true,
+    message: 'Notification broadcasted successfully',
+    data: { notification: notif },
   });
 });
 
 router.patch('/notifications/read-all', requireDemoAuth, (req, res) => {
   DEMO_NOTIFICATIONS.forEach((n) => {
-    if (n.user === req.user._id || n.type === 'BROADCAST') n.read = true;
+    if (n.user === req.user._id || n.type === 'BROADCAST') {
+      n.read = true;
+      n.isRead = true;
+    }
   });
   return res.status(200).json({ success: true, message: 'All notifications marked as read' });
 });
 
 router.patch('/notifications/:id/read', requireDemoAuth, (req, res) => {
   const notif = DEMO_NOTIFICATIONS.find((n) => n._id === req.params.id);
-  if (notif) notif.read = true;
+  if (notif) {
+    notif.read = true;
+    notif.isRead = true;
+  }
   return res.status(200).json({ success: true, message: 'Notification marked as read' });
 });
 
@@ -795,3 +860,4 @@ router.post('/upload', (req, res) => {
 });
 
 module.exports = router;
+
