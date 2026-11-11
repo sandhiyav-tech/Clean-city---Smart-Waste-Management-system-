@@ -1,5 +1,7 @@
 # 🌿 CleanCity – Smart Waste Management System
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsandhiyav-tech%2FClean-city---Smart-Waste-Management-system-)
+
 A production-ready full-stack web application for municipal waste monitoring, citizen garbage reporting, and fleet route optimization. Built as a unified monorepo deploying seamlessly as **one single Vercel project**.
 
 ---
