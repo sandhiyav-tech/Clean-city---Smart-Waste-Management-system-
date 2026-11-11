@@ -36,6 +36,12 @@ async function connectDB() {
 
   try {
     cached.conn = await cached.promise;
+    // Auto-seed if database is brand new and has no records
+    if (!cached.hasSeeded) {
+      cached.hasSeeded = true;
+      const { autoSeedIfEmpty } = require('../seed/seed');
+      autoSeedIfEmpty().catch(() => {});
+    }
   } catch (e) {
     cached.promise = null;
     throw e;

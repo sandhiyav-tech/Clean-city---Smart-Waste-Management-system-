@@ -269,7 +269,7 @@ const CHENNAI_REPORTS_DATA = [
   },
 ];
 
-async function seedDatabase() {
+async function seedDatabase(shouldExit = false) {
   console.log('[Seed] Starting CleanCity database seeding...');
   await connectDB();
 
@@ -435,16 +435,33 @@ async function seedDatabase() {
   ]);
 
   console.log('[Seed] Created initial notifications.');
-  console.log('[Seed] Database successfully seeded! Exiting process.');
-  process.exit(0);
+  console.log('[Seed] Database successfully seeded!');
+  if (shouldExit) {
+    process.exit(0);
+  }
+}
+
+async function autoSeedIfEmpty() {
+  try {
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      console.log('[AutoSeed] Empty database detected. Auto-seeding initial demo accounts & Chennai reports...');
+      await seedDatabase(false);
+    }
+  } catch (err) {
+    console.warn('[AutoSeed] Notice:', err.message);
+  }
 }
 
 if (require.main === module) {
-  seedDatabase().catch((err) => {
+  seedDatabase(true).catch((err) => {
     console.error('[Seed Error]:', err);
     process.exit(1);
   });
 }
 
-module.exports = seedDatabase;
+module.exports = {
+  seedDatabase,
+  autoSeedIfEmpty,
+};
 
