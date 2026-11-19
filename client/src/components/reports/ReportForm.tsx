@@ -109,7 +109,7 @@ export const ReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
           const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
           localCustom.unshift(res.data.data.report);
           localStorage.setItem('cleancity_local_reports', JSON.stringify(localCustom));
-        } catch {}
+        } catch { }
       }
 
       toast('Garbage report submitted successfully! Thank you.', 'success');
@@ -176,11 +176,10 @@ export const ReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
                 type="button"
                 key={w.type}
                 onClick={() => setWasteType(w.type)}
-                className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all ${
-                  isSelected
+                className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all ${isSelected
                     ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20'
                     : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2 mb-1">
                   {w.icon}

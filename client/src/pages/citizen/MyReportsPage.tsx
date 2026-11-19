@@ -1,19 +1,42 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ReportTable } from '../../components/reports/ReportTable';
 import { Report, ReportStatus, WasteType } from '../../types';
 import axiosClient from '../../api/axiosClient';
-import { PlusCircle, Search, Filter } from 'lucide-react';
+import { PlusCircle, Search, Filter, CheckCircle2, Clock, Truck, Layers } from 'lucide-react';
 
 export const MyReportsPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status') || 'ALL';
+
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [wasteTypeFilter, setWasteTypeFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
   const limit = 10;
+
+  // Sync with searchParams if URL changes
+  useEffect(() => {
+    const urlStatus = searchParams.get('status');
+    if (urlStatus && urlStatus !== statusFilter) {
+      setStatusFilter(urlStatus);
+      setPage(1);
+    }
+  }, [searchParams]);
+
+  const handleStatusFilterChange = (newStatus: string) => {
+    setStatusFilter(newStatus);
+    setPage(1);
+    if (newStatus === 'ALL') {
+      searchParams.delete('status');
+      setSearchParams(searchParams);
+    } else {
+      setSearchParams({ ...Object.fromEntries(searchParams.entries()), status: newStatus });
+    }
+  };
 
   const fetchReports = useCallback(async () => {
     try {
@@ -28,8 +51,27 @@ export const MyReportsPage: React.FC = () => {
 
       const res = await axiosClient.get(`/reports?${params.toString()}`);
       if (res.data?.success) {
-        setReports(res.data.data.reports || []);
-        setTotal(res.data.data.pagination?.total || 0);
+        let fetchedReports: Report[] = res.data.data.reports || [];
+        try {
+          const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+          if (Array.isArray(localCustom) && localCustom.length > 0) {
+            const existingIds = new Set(fetchedReports.map((r) => r._id));
+            const missing = localCustom.filter((cr: Report) => !existingIds.has(cr._id));
+            if (missing.length > 0) {
+              fetchedReports = [...missing, ...fetchedReports];
+            }
+          }
+        } catch {}
+
+        if (statusFilter !== 'ALL') {
+          fetchedReports = fetchedReports.filter((r) => r.status === statusFilter);
+        }
+        if (wasteTypeFilter !== 'ALL') {
+          fetchedReports = fetchedReports.filter((r) => r.wasteType === wasteTypeFilter);
+        }
+
+        setReports(fetchedReports);
+        setTotal(res.data.data.pagination?.total || fetchedReports.length);
       }
     } catch (err) {
       console.error('Failed to fetch my reports:', err);
@@ -54,7 +96,7 @@ export const MyReportsPage: React.FC = () => {
             My Waste Reports
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Track the cleanup progress and driver assignments for all your submitted reports.
+            Track cleanup progress, driver assignments, and verified collected reports.
           </p>
         </div>
         <Link
@@ -64,6 +106,61 @@ export const MyReportsPage: React.FC = () => {
           <PlusCircle className="w-4 h-4" />
           <span>New Report</span>
         </Link>
+      </div>
+
+      {/* Quick Status Filter Pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => handleStatusFilterChange('ALL')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            statusFilter === 'ALL'
+              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
+              : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>All Reports</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusFilterChange('COLLECTED')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            statusFilter === 'COLLECTED'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+              : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800'
+          }`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Collected & Resolved</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusFilterChange('IN_PROGRESS')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            statusFilter === 'IN_PROGRESS'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-800'
+          }`}
+        >
+          <Truck className="w-3.5 h-3.5 text-blue-500" />
+          <span>In Progress</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusFilterChange('PENDING')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            statusFilter === 'PENDING'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+              : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5 text-amber-500" />
+          <span>Pending Review</span>
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -86,17 +183,14 @@ export const MyReportsPage: React.FC = () => {
         {/* Status Filter */}
         <select
           value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => handleStatusFilterChange(e.target.value)}
           className="px-4 py-2.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
         >
           <option value="ALL">All Statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="ASSIGNED">Assigned</option>
+          <option value="COLLECTED">Collected & Resolved</option>
           <option value="IN_PROGRESS">In Progress</option>
-          <option value="COLLECTED">Collected</option>
+          <option value="ASSIGNED">Assigned</option>
+          <option value="PENDING">Pending</option>
         </select>
 
         {/* Waste Type Filter */}

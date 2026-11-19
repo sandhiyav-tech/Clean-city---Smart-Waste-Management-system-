@@ -65,6 +65,7 @@ export const Navbar: React.FC = () => {
       { label: 'Dashboard', path: '/citizen' },
       { label: 'Report Garbage', path: '/citizen/new' },
       { label: 'My Reports', path: '/citizen/reports' },
+      { label: 'Collected Reports', path: '/citizen/reports?status=COLLECTED' },
       { label: 'City Map', path: '/map' },
     ];
   };

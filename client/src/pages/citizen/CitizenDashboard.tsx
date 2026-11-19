@@ -15,6 +15,7 @@ export const CitizenDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ALL' | 'COLLECTED'>('ALL');
 
   useEffect(() => {
     fetchMyReports();
@@ -23,9 +24,18 @@ export const CitizenDashboard: React.FC = () => {
   const fetchMyReports = async () => {
     try {
       setLoading(true);
-      const res = await axiosClient.get('/reports?limit=10');
+      const res = await axiosClient.get('/reports?limit=50');
       if (res.data?.success) {
-        setReports(res.data.data.reports || []);
+        let fetched: Report[] = res.data.data.reports || [];
+        try {
+          const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+          if (Array.isArray(localCustom) && localCustom.length > 0) {
+            const existingIds = new Set(fetched.map((r) => r._id));
+            const missing = localCustom.filter((cr: Report) => !existingIds.has(cr._id));
+            if (missing.length > 0) fetched = [...missing, ...fetched];
+          }
+        } catch {}
+        setReports(fetched);
       }
     } catch (err) {
       console.error('Failed to fetch reports:', err);
@@ -37,6 +47,10 @@ export const CitizenDashboard: React.FC = () => {
   const pendingCount = reports.filter((r) => r.status === 'PENDING').length;
   const inProgressCount = reports.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'ASSIGNED').length;
   const collectedCount = reports.filter((r) => r.status === 'COLLECTED').length;
+
+  const displayedReports = activeTab === 'COLLECTED'
+    ? reports.filter((r) => r.status === 'COLLECTED')
+    : reports;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -64,52 +78,123 @@ export const CitizenDashboard: React.FC = () => {
 
       {/* Stats KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
-          <div className="text-xs font-bold text-gray-500 uppercase">My Total Reports</div>
+        <Link
+          to="/citizen/reports"
+          className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all group block"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-gray-500 uppercase">My Total Reports</div>
+            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
+          </div>
           <div className="text-3xl font-extrabold text-gray-900 dark:text-white mt-2">
             {reports.length}
           </div>
           <div className="text-xs text-gray-400 mt-1">Submissions from this account</div>
-        </div>
+        </Link>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
-          <div className="text-xs font-bold text-amber-600 uppercase">Pending Review</div>
+        <Link
+          to="/citizen/reports?status=PENDING"
+          className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:border-amber-500 hover:shadow-md transition-all group block"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-amber-600 uppercase flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Pending Review</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-amber-500 group-hover:translate-x-0.5 transition-all" />
+          </div>
           <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-2">
             {pendingCount}
           </div>
-          <div className="text-xs text-gray-400 mt-1">Awaiting driver assignment</div>
-        </div>
+          <div className="text-xs text-amber-600/80 font-medium mt-1">Click to view pending →</div>
+        </Link>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
-          <div className="text-xs font-bold text-blue-600 uppercase">Assigned / In Progress</div>
+        <Link
+          to="/citizen/reports?status=IN_PROGRESS"
+          className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:border-blue-500 hover:shadow-md transition-all group block"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-blue-600 uppercase flex items-center gap-1">
+              <Truck className="w-3.5 h-3.5" />
+              <span>In Progress</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-blue-500 group-hover:translate-x-0.5 transition-all" />
+          </div>
           <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
             {inProgressCount}
           </div>
-          <div className="text-xs text-gray-400 mt-1">Driver en route to location</div>
-        </div>
+          <div className="text-xs text-blue-600/80 font-medium mt-1">Click to view active →</div>
+        </Link>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
-          <div className="text-xs font-bold text-emerald-600 uppercase">Resolved & Cleaned</div>
+        <Link
+          to="/citizen/reports?status=COLLECTED"
+          className="bg-white dark:bg-gray-900 p-6 rounded-3xl border-2 border-emerald-500/30 bg-emerald-50/10 dark:bg-emerald-950/20 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all group block"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Resolved & Cleaned</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+          </div>
           <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
             {collectedCount}
           </div>
-          <div className="text-xs text-gray-400 mt-1">Successfully collected</div>
-        </div>
+          <div className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">
+            See Collected Reports →
+          </div>
+        </Link>
       </div>
 
-      {/* Recent Submissions */}
+      {/* Submissions Section with Tabs */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            My Recent Waste Reports
-          </h2>
-          <Link
-            to="/citizen/reports"
-            className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <span>View All</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              {activeTab === 'COLLECTED' ? 'My Collected & Cleaned Reports' : 'My Recent Waste Reports'}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {activeTab === 'COLLECTED'
+                ? 'Reports verified and successfully cleared by municipal collection teams'
+                : 'All waste reports submitted from your account'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-2xl bg-gray-100 dark:bg-gray-800 p-1 border border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => setActiveTab('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'ALL'
+                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                All Reports ({reports.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('COLLECTED')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  activeTab === 'COLLECTED'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Collected ({collectedCount})</span>
+              </button>
+            </div>
+
+            <Link
+              to={activeTab === 'COLLECTED' ? '/citizen/reports?status=COLLECTED' : '/citizen/reports'}
+              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 pl-2"
+            >
+              <span>Full Table</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
 
         {loading ? (
@@ -117,16 +202,20 @@ export const CitizenDashboard: React.FC = () => {
             <CardSkeleton />
             <CardSkeleton />
           </div>
-        ) : reports.length === 0 ? (
+        ) : displayedReports.length === 0 ? (
           <EmptyState
-            title="No reports submitted yet"
-            description="You haven't reported any garbage locations yet. Help keep Chennai clean by submitting your first report!"
-            actionText="Submit First Report"
+            title={activeTab === 'COLLECTED' ? 'No collected reports yet' : 'No reports submitted yet'}
+            description={
+              activeTab === 'COLLECTED'
+                ? 'Your reported waste hotspots will appear here once our municipal collection crews have cleared and confirmed them.'
+                : "You haven't reported any garbage locations yet. Help keep Chennai clean by submitting your first report!"
+            }
+            actionText="Submit New Report"
             onAction={() => (window.location.href = '/citizen/new')}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {reports.slice(0, 4).map((report) => (
+            {displayedReports.slice(0, 6).map((report) => (
               <div
                 key={report._id}
                 className="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col justify-between hover:border-emerald-500 transition-colors"
