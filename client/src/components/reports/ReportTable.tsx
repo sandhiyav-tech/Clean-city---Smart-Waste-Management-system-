@@ -102,7 +102,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({
         localNotifs.unshift(notif);
         localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
         window.dispatchEvent(new Event('cleancity_notification_updated'));
-      } catch {}
+      } catch { }
       toast('Driver assigned successfully!', 'success');
       setAssignModalOpen(false);
       onRefresh();
@@ -154,7 +154,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({
         localNotifs.unshift(notif);
         localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
         window.dispatchEvent(new Event('cleancity_notification_updated'));
-      } catch {}
+      } catch { }
       toast(`Status updated to ${newStatus}`, 'success');
       setStatusModalOpen(false);
       onRefresh();
@@ -178,7 +178,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           deletedIds.push(reportId);
           localStorage.setItem('cleancity_deleted_ids', JSON.stringify(deletedIds));
         }
-      } catch {}
+      } catch { }
 
       try {
         await axiosClient.delete(`/reports/${reportId}`);

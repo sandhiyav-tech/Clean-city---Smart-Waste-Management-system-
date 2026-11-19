@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import { Report } from '../../types';
-import { createStatusIcon, depotIcon } from './mapIcons';
+import { createStatusIcon, depotIcon, createDriverTruckIcon } from './mapIcons';
 import { StatusBadge, WasteBadge } from '../common/StatusBadge';
 import { MapPin, Calendar, Clock, Navigation } from 'lucide-react';
 
@@ -11,6 +11,7 @@ interface LeafletMapProps {
   zoom?: number;
   routePolyline?: [number, number][];
   startOrigin?: { lat: number; lng: number; address?: string };
+  driverPosition?: { lat: number; lng: number; label?: string; nextAddress?: string };
   height?: string;
   onMarkerSelect?: (report: Report) => void;
 }
@@ -39,12 +40,24 @@ const AutoFitBounds: React.FC<{ reports: Report[]; routePolyline?: [number, numb
   return null;
 };
 
+// Helper to smoothly fly to the driver position when it updates
+const MapPanToDriver: React.FC<{ driverPosition?: { lat: number; lng: number } }> = ({ driverPosition }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (driverPosition && typeof driverPosition.lat === 'number' && typeof driverPosition.lng === 'number') {
+      map.flyTo([driverPosition.lat, driverPosition.lng], 14, { duration: 1.2 });
+    }
+  }, [map, driverPosition?.lat, driverPosition?.lng]);
+  return null;
+};
+
 export const LeafletMap: React.FC<LeafletMapProps> = ({
   reports,
   center = [13.0827, 80.2707], // Default Chennai Ripon Building
   zoom = 12,
   routePolyline,
   startOrigin,
+  driverPosition,
   height = '550px',
   onMarkerSelect,
 }) => {
@@ -62,6 +75,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         />
 
         <AutoFitBounds reports={reports} routePolyline={routePolyline} />
+        <MapPanToDriver driverPosition={driverPosition} />
 
         {/* Start origin marker (e.g. Depot) */}
         {startOrigin && (
@@ -73,6 +87,25 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
                 </span>
                 <p className="text-sm font-semibold text-gray-900">{startOrigin.address || 'Chennai Central Hub'}</p>
                 <p className="text-xs text-gray-500">Fleet Route Starting Point</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Live Driver Position Marker */}
+        {driverPosition && (
+          <Marker position={[driverPosition.lat, driverPosition.lng]} icon={createDriverTruckIcon(driverPosition.label)}>
+            <Popup>
+              <div className="p-2 space-y-1">
+                <span className="font-bold text-xs uppercase tracking-wide text-emerald-600 flex items-center gap-1">
+                  <span>🚚 {driverPosition.label || 'EcoDriver On Active Route'}</span>
+                </span>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Live Vehicle Position</p>
+                {driverPosition.nextAddress && (
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium pt-1 border-t border-gray-100 dark:border-gray-800">
+                    Heading towards: {driverPosition.nextAddress}
+                  </p>
+                )}
               </div>
             </Popup>
           </Marker>
