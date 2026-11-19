@@ -41,8 +41,27 @@ export const AllReportsPage: React.FC = () => {
 
       const res = await axiosClient.get(`/reports?${params.toString()}`);
       if (res.data?.success) {
-        setReports(res.data.data.reports || []);
-        setTotal(res.data.data.pagination?.total || 0);
+        let fetchedReports: Report[] = res.data.data.reports || [];
+        try {
+          const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+          if (Array.isArray(localCustom) && localCustom.length > 0) {
+            const existingIds = new Set(fetchedReports.map((r) => r._id));
+            const missing = localCustom.filter((cr: Report) => !existingIds.has(cr._id));
+            if (missing.length > 0) {
+              fetchedReports = [...missing, ...fetchedReports];
+            }
+          }
+        } catch {}
+
+        if (statusFilter !== 'ALL') {
+          fetchedReports = fetchedReports.filter((r) => r.status === statusFilter);
+        }
+        if (wasteTypeFilter !== 'ALL') {
+          fetchedReports = fetchedReports.filter((r) => r.wasteType === wasteTypeFilter);
+        }
+
+        setReports(fetchedReports);
+        setTotal(res.data.data.pagination?.total || fetchedReports.length);
       }
     } catch (err) {
       console.error('Failed to fetch admin reports:', err);

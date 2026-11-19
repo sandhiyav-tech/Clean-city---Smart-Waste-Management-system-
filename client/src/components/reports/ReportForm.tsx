@@ -103,7 +103,14 @@ export const ReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
         imageUrl: uploadedUrl || imagePreview || '',
       };
 
-      await axiosClient.post('/reports', payload);
+      const res = await axiosClient.post('/reports', payload);
+      if (res.data?.data?.report) {
+        try {
+          const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+          localCustom.unshift(res.data.data.report);
+          localStorage.setItem('cleancity_local_reports', JSON.stringify(localCustom));
+        } catch {}
+      }
 
       toast('Garbage report submitted successfully! Thank you.', 'success');
       if (onSuccess) {

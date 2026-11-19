@@ -75,7 +75,17 @@ export const ReportTable: React.FC<ReportTableProps> = ({
     try {
       await axiosClient.patch(`/reports/${reportToAssign._id}/assign`, {
         driverId: selectedDriverId,
+        title: reportToAssign.title,
       });
+      try {
+        const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+        const updated = localCustom.map((r: Report) =>
+          r._id === reportToAssign._id
+            ? { ...r, status: 'ASSIGNED', assignedDriver: drivers.find((d) => d._id === selectedDriverId) || null }
+            : r
+        );
+        localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+      } catch {}
       toast('Driver assigned successfully!', 'success');
       setAssignModalOpen(false);
       onRefresh();
@@ -100,7 +110,15 @@ export const ReportTable: React.FC<ReportTableProps> = ({
       await axiosClient.patch(`/reports/${reportToUpdate._id}/status`, {
         status: newStatus,
         note: statusNote || undefined,
+        title: reportToUpdate.title,
       });
+      try {
+        const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+        const updated = localCustom.map((r: Report) =>
+          r._id === reportToUpdate._id ? { ...r, status: newStatus } : r
+        );
+        localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+      } catch {}
       toast(`Status updated to ${newStatus}`, 'success');
       setStatusModalOpen(false);
       onRefresh();
