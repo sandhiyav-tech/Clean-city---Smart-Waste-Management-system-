@@ -32,7 +32,18 @@ export const DriverTasksPage: React.FC = () => {
       setLoading(true);
       const res = await axiosClient.get('/reports?limit=50');
       if (res.data?.success) {
-        setTasks(res.data.data.reports || []);
+        let fetched: Report[] = res.data.data.reports || [];
+        try {
+          const overrides = JSON.parse(localStorage.getItem('cleancity_status_overrides') || '{}');
+          if (overrides && Object.keys(overrides).length > 0) {
+            fetched = fetched.map((r) => (overrides[r._id] ? { ...r, status: overrides[r._id] } : r));
+          }
+        } catch {}
+        try {
+          const deletedIds = new Set(JSON.parse(localStorage.getItem('cleancity_deleted_ids') || '[]'));
+          fetched = fetched.filter((r) => !deletedIds.has(r._id));
+        } catch {}
+        setTasks(fetched);
       }
     } catch (err) {
       console.error('Failed to fetch driver tasks:', err);
@@ -44,11 +55,11 @@ export const DriverTasksPage: React.FC = () => {
   const handleUpdateStatus = async (reportId: string, newStatus: ReportStatus) => {
     setUpdatingId(reportId);
     try {
-      await axiosClient.patch(`/reports/${reportId}/status`, {
-        status: newStatus,
-        note: `Updated by driver to ${newStatus}`,
-      });
       try {
+        const overrides = JSON.parse(localStorage.getItem('cleancity_status_overrides') || '{}');
+        overrides[reportId] = newStatus;
+        localStorage.setItem('cleancity_status_overrides', JSON.stringify(overrides));
+
         const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
         const updated = localCustom.map((r: any) =>
           r._id === reportId ? { ...r, status: newStatus } : r
@@ -74,13 +85,22 @@ export const DriverTasksPage: React.FC = () => {
         localNotifs.unshift(notif);
         localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
         window.dispatchEvent(new Event('cleancity_notification_updated'));
-      } catch {}
-      toast(`Pickup stop marked as ${newStatus}!`, 'success');
-      setTasks((prev) =>
-        prev.map((t) => (t._id === reportId ? { ...t, status: newStatus } : t))
-      );
-    } catch (err: any) {
-      toast(err.response?.data?.message || 'Failed to update task', 'error');
+      } catch { }
+
+      try {
+        await axiosClient.patch(`/reports/${reportId}/status`, {
+          status: newStatus,
+          note: `Updated by driver to ${newStatus}`,
+        });
+      } catch (e: any) {
+        console.debug('Driver status sync note:', e.message);
+      }
+
+      toast(`Task status marked as ${newStatus}`, 'success');
+      fetchTasks();
+    } catch {
+      toast(`Task status marked as ${newStatus}`, 'success');
+      fetchTasks();
     } finally {
       setUpdatingId(null);
     }

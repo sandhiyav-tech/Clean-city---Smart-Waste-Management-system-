@@ -83,14 +83,35 @@ export const depotIcon = L.divIcon({
   popupAnchor: [0, -20],
 });
 
-export const createDriverTruckIcon = (driverName: string = 'EcoDriver') => {
+export const createDriverTruckIcon = (
+  driverName: string = 'EcoDriver',
+  isMoving: boolean = false,
+  headingDeg: number = 0
+) => {
   return L.divIcon({
     className: 'custom-driver-vehicle-marker',
     html: `
-      <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; width: 48px; height: 48px; background: rgba(16, 185, 129, 0.4); border-radius: 50%; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-        <div style="position: relative; width: 38px; height: 38px; background: #064e3b; border: 3px solid #34d399; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px rgba(0,0,0,0.4);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <div style="position: relative; width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; pointer-events: auto;">
+        ${
+          isMoving
+            ? `<div style="position: absolute; width: 54px; height: 54px; background: rgba(16, 185, 129, 0.5); border-radius: 50%; animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
+            : `<div style="position: absolute; width: 44px; height: 44px; background: rgba(16, 185, 129, 0.3); border-radius: 50%; animation: pulse 2s infinite;"></div>`
+        }
+        <div style="
+          position: relative;
+          width: 42px;
+          height: 42px;
+          background: #064e3b;
+          border: 3px solid ${isMoving ? '#34d399' : '#10b981'};
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 8px 18px rgba(0,0,0,0.4);
+          transform: rotate(${headingDeg}deg);
+          transition: transform 0.2s ease-out;
+        ">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/>
             <path d="M15 18H9"/>
             <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/>
@@ -98,11 +119,16 @@ export const createDriverTruckIcon = (driverName: string = 'EcoDriver') => {
             <circle cx="7" cy="18" r="2"/>
           </svg>
         </div>
+        ${
+          isMoving
+            ? `<div style="position: absolute; bottom: -7px; background: #10b981; color: #ffffff; font-size: 8.5px; font-weight: 800; padding: 1px 6px; border-radius: 9999px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.35); letter-spacing: 0.5px;">EN ROUTE 🚚</div>`
+            : ''
+        }
       </div>
     `,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-    popupAnchor: [0, -26],
+    iconSize: [54, 54],
+    iconAnchor: [27, 27],
+    popupAnchor: [0, -28],
   });
 };
 

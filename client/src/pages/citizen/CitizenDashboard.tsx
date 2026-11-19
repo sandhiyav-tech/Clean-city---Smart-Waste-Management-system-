@@ -39,6 +39,13 @@ export const CitizenDashboard: React.FC = () => {
         } catch {}
 
         try {
+          const overrides = JSON.parse(localStorage.getItem('cleancity_status_overrides') || '{}');
+          if (overrides && Object.keys(overrides).length > 0) {
+            fetched = fetched.map((r) => (overrides[r._id] ? { ...r, status: overrides[r._id] } : r));
+          }
+        } catch {}
+
+        try {
           const deletedIds = new Set(JSON.parse(localStorage.getItem('cleancity_deleted_ids') || '[]'));
           fetched = fetched.filter((r) => !deletedIds.has(r._id));
         } catch {}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { LeafletMap } from '../../components/map/LeafletMap';
 import { OptimizedRouteResult, Report } from '../../types';
 import axiosClient from '../../api/axiosClient';
@@ -14,8 +14,9 @@ import {
   Route as RouteIcon,
   Truck,
   RotateCcw,
-  ChevronRight,
-  ExternalLink,
+  Play,
+  Pause,
+  ArrowRight,
 } from 'lucide-react';
 
 export const OptimizedRoutePage: React.FC = () => {
@@ -23,6 +24,8 @@ export const OptimizedRoutePage: React.FC = () => {
   const [routeData, setRouteData] = useState<OptimizedRouteResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [optimizing, setOptimizing] = useState(false);
+  const [isAutoTouring, setIsAutoTouring] = useState(false);
+  const autoTourTimerRef = useRef<any>(null);
 
   const depot = useMemo(
     () => ({
@@ -41,12 +44,15 @@ export const OptimizedRoutePage: React.FC = () => {
   }>({
     lat: 13.0827,
     lng: 80.2707,
-    label: 'EcoDriver #2 (Municipal Depot)',
-    nextAddress: 'Stop #1',
+    label: 'EcoDriver Truck #2 (Municipal Depot)',
+    nextAddress: 'Stop #1 • Nungambakkam High Road',
   });
 
   useEffect(() => {
     calculateRoute();
+    return () => {
+      if (autoTourTimerRef.current) clearTimeout(autoTourTimerRef.current);
+    };
   }, []);
 
   const calculateRoute = async () => {
@@ -63,8 +69,13 @@ export const OptimizedRoutePage: React.FC = () => {
 
       if (res.data?.success) {
         let stops: Report[] = res.data.data.orderedStops || [];
-        // Sync local collected status if previously updated in browser
+
+        // Apply local overrides and local reports
         try {
+          const overrides = JSON.parse(localStorage.getItem('cleancity_status_overrides') || '{}');
+          if (overrides && Object.keys(overrides).length > 0) {
+            stops = stops.map((s) => (overrides[s._id] ? { ...s, status: overrides[s._id] } : s));
+          }
           const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
           if (Array.isArray(localCustom)) {
             const statusMap = new Map(localCustom.map((r: Report) => [r._id, r.status]));
@@ -82,24 +93,31 @@ export const OptimizedRoutePage: React.FC = () => {
         // Determine current driver location based on completed stops
         const pickups = (stops as any[]).filter((s: any) => !s.isStart && s._id !== 'start');
         const nextTarget = pickups.find((s) => s.status !== 'COLLECTED');
-        const lastCollectedIdx = pickups.reduce(
-          (last, s, i) => (s.status === 'COLLECTED' ? i : last),
-          -1
-        );
+        const collectedStops = pickups.filter((s) => s.status === 'COLLECTED');
 
-        if (lastCollectedIdx >= 0 && pickups[lastCollectedIdx]?.location) {
+        if (nextTarget && nextTarget.location) {
+          // If some are collected, van is heading to or waiting at the next target
           setDriverPosition({
-            lat: pickups[lastCollectedIdx].location.lat,
-            lng: pickups[lastCollectedIdx].location.lng,
-            label: `EcoDriver (Cleared Stop #${lastCollectedIdx + 1})`,
-            nextAddress: nextTarget ? `Stop #${pickups.indexOf(nextTarget) + 1} • ${nextTarget.location?.address}` : 'Returning to Depot',
+            lat: nextTarget.location.lat,
+            lng: nextTarget.location.lng,
+            label: `EcoDriver (Stop #${pickups.indexOf(nextTarget) + 1})`,
+            nextAddress: nextTarget.location.address || 'Chennai',
+          });
+        } else if (collectedStops.length > 0 && collectedStops.length === pickups.length) {
+          // All collected, van returned to depot
+          setDriverPosition({
+            lat: depot.lat,
+            lng: depot.lng,
+            label: 'EcoDriver (Ripon Depot - Route Complete)',
+            nextAddress: 'All collection stops cleared',
           });
         } else {
+          // Starting at depot
           setDriverPosition({
             lat: depot.lat,
             lng: depot.lng,
             label: 'EcoDriver (Municipal Depot)',
-            nextAddress: nextTarget ? `Stop #1 • ${nextTarget.location?.address}` : undefined,
+            nextAddress: pickups[0]?.location?.address || 'Stop #1',
           });
         }
 
@@ -125,6 +143,18 @@ export const OptimizedRoutePage: React.FC = () => {
   const nextTargetIndex = pickupStops.findIndex((s) => s.status !== 'COLLECTED');
   const nextTargetStop = nextTargetIndex !== -1 ? pickupStops[nextTargetIndex] : null;
 
+  // Command the van to smoothly drive to any given coordinate
+  const handleDriveToLocation = (lat: number, lng: number, label: string, address?: string) => {
+    setDriverPosition({
+      lat,
+      lng,
+      label: `EcoDriver (${label})`,
+      nextAddress: address || label,
+    });
+    toast(`🚚 EcoDriver van dispatched to ${label}`, 'info');
+  };
+
+  // Collect waste and smoothly drive the van to the NEXT stop location
   const handleMarkStopCollected = async (reportId: string) => {
     const targetIdx = pickupStops.findIndex((s) => s._id === reportId);
     const stopToCollect = pickupStops[targetIdx];
@@ -139,69 +169,91 @@ export const OptimizedRoutePage: React.FC = () => {
       return { ...prev, orderedStops: updatedStops };
     });
 
-    // 2. Sync with localStorage
+    // 2. Persist in localStorage overrides
     try {
+      const overrides = JSON.parse(localStorage.getItem('cleancity_status_overrides') || '{}');
+      overrides[reportId] = 'COLLECTED';
+      localStorage.setItem('cleancity_status_overrides', JSON.stringify(overrides));
+
       const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
       const updated = localCustom.map((r: Report) =>
         r._id === reportId ? { ...r, status: 'COLLECTED' } : r
       );
       localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+
+      // Push notification
+      const notif = {
+        _id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        user: stopToCollect.user?._id || null,
+        targetRole: 'CITIZEN',
+        title: 'Waste Collected & Cleared',
+        message: `Waste Collected! Your report "${stopToCollect.title}" has been successfully collected by EcoDriver! Thank you.`,
+        type: 'STATUS_UPDATE',
+        reportId: stopToCollect._id,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      };
+      const localNotifs = JSON.parse(localStorage.getItem('cleancity_local_notifications') || '[]');
+      localNotifs.unshift(notif);
+      localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
       window.dispatchEvent(new Event('cleancity_notification_updated'));
     } catch {}
 
-    // 3. Find next destination
+    // 3. Find the NEXT uncollected destination stop
     const remainingStops = pickupStops.filter(
       (s) => s._id !== reportId && s.status !== 'COLLECTED'
     );
     const nextStopAfterThis = remainingStops[0];
 
-    // 4. Move driver truck to this collected stop immediately
-    if (stopToCollect.location?.lat && stopToCollect.location?.lng) {
+    // 4. Move driver van to the NEXT stop location!
+    if (nextStopAfterThis && nextStopAfterThis.location?.lat && nextStopAfterThis.location?.lng) {
       setDriverPosition({
-        lat: stopToCollect.location.lat,
-        lng: stopToCollect.location.lng,
-        label: `EcoDriver (Completed Stop #${targetIdx + 1})`,
-        nextAddress: nextStopAfterThis
-          ? `Stop #${pickupStops.indexOf(nextStopAfterThis) + 1} (${nextStopAfterThis.location?.address})`
-          : 'Returning to Municipal Depot',
+        lat: nextStopAfterThis.location.lat,
+        lng: nextStopAfterThis.location.lng,
+        label: `EcoDriver (Next: Stop #${pickupStops.indexOf(nextStopAfterThis) + 1})`,
+        nextAddress: `Stop #${pickupStops.indexOf(nextStopAfterThis) + 1} • ${nextStopAfterThis.location?.address}`,
       });
-    }
-
-    if (nextStopAfterThis) {
       toast(
-        `✅ Stop #${targetIdx + 1} collected! Driver moving to Stop #${pickupStops.indexOf(nextStopAfterThis) + 1}: ${nextStopAfterThis.location?.address}`,
+        `🚚 Stop #${targetIdx + 1} collected! Van driving to Stop #${pickupStops.indexOf(nextStopAfterThis) + 1}: ${nextStopAfterThis.location?.address}`,
         'success'
       );
     } else {
+      // All stops cleared! Van returns to Municipal Depot!
+      setDriverPosition({
+        lat: depot.lat,
+        lng: depot.lng,
+        label: 'EcoDriver (All Collected - Returning to Depot)',
+        nextAddress: 'Municipal Dispatch Depot (Ripon Building)',
+      });
       toast(
-        '🎉 All waste stops collected! Returning driver to Municipal Depot.',
+        '🎉 All waste stops collected across Chennai! EcoDriver van returning to Municipal Depot.',
         'success'
       );
-      setTimeout(() => {
-        setDriverPosition({
-          lat: depot.lat,
-          lng: depot.lng,
-          label: 'EcoDriver (Route Completed - Ripon Depot)',
-          nextAddress: 'All pickups completed for today',
-        });
-      }, 1500);
     }
 
-    // 5. Send background update to server
+    // 5. Send background status sync to server
     try {
       await axiosClient.patch(`/reports/${reportId}/status`, {
         status: 'COLLECTED',
-        note: 'Collected during optimized route run',
+        note: 'Collected during dynamic route run',
         title: stopToCollect.title,
       });
     } catch (err: any) {
-      console.debug('Background status sync complete:', err);
+      console.debug('Background status sync note:', err.message);
     }
   };
 
+  // Reset demonstration back to beginning
   const handleResetRouteDemo = async () => {
     try {
       setLoading(true);
+      if (autoTourTimerRef.current) clearTimeout(autoTourTimerRef.current);
+      setIsAutoTouring(false);
+
+      try {
+        localStorage.removeItem('cleancity_status_overrides');
+      } catch {}
+
       setRouteData((prev) => {
         if (!prev) return prev;
         const resetStops = prev.orderedStops.map((s, idx) => ({
@@ -211,17 +263,63 @@ export const OptimizedRoutePage: React.FC = () => {
         return { ...prev, orderedStops: resetStops };
       });
 
+      // Move van smoothly back to depot
       setDriverPosition({
         lat: depot.lat,
         lng: depot.lng,
         label: 'EcoDriver #2 (Ripon Depot)',
-        nextAddress: pickupStops[0]?.location?.address || 'Stop #1',
+        nextAddress: pickupStops[0]?.location?.address || 'Stop #1 (Nungambakkam High Road)',
       });
 
-      toast('Route demonstration reset! Driver is ready at Municipal Depot.', 'info');
+      toast('Route demonstration reset! EcoDriver van returned to Municipal Depot.', 'info');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Auto-drive simulation: drives through stops automatically step-by-step
+  const toggleAutoDriveTour = () => {
+    if (isAutoTouring) {
+      setIsAutoTouring(false);
+      if (autoTourTimerRef.current) clearTimeout(autoTourTimerRef.current);
+      toast('Auto-drive tour paused.', 'info');
+      return;
+    }
+
+    setIsAutoTouring(true);
+    toast('🚀 Auto-drive simulation started! Watch the van advance from stop to stop.', 'success');
+
+    let idx = 0;
+    const stepTour = () => {
+      // Find next uncollected stop
+      const uncollected = pickupStops.filter((s) => s.status !== 'COLLECTED');
+      if (uncollected.length === 0 || idx >= pickupStops.length) {
+        handleDriveToLocation(depot.lat, depot.lng, 'Municipal Depot', depot.address);
+        setIsAutoTouring(false);
+        toast('🎉 Auto-tour complete! All stops collected.', 'success');
+        return;
+      }
+
+      const currentStop = uncollected[0];
+      const stopIndexInAll = pickupStops.indexOf(currentStop);
+
+      // Move van to this stop
+      handleDriveToLocation(
+        currentStop.location.lat,
+        currentStop.location.lng,
+        `Stop #${stopIndexInAll + 1}`,
+        currentStop.location.address
+      );
+
+      // After 2.4s glide, mark collected and trigger next
+      autoTourTimerRef.current = setTimeout(() => {
+        handleMarkStopCollected(currentStop._id);
+        idx++;
+        autoTourTimerRef.current = setTimeout(stepTour, 2600);
+      }, 2400);
+    };
+
+    stepTour();
   };
 
   const completedCount = pickupStops.filter((s) => s.status === 'COLLECTED').length;
@@ -239,11 +337,23 @@ export const OptimizedRoutePage: React.FC = () => {
             Optimized Waste Collection Route
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Real-time turn-by-turn route dispatch: the driver automatically advances along the 2-Opt path after each pickup.
+            Real-time turn-by-turn route dispatch: the green van physically glides to the next stop location when waste is collected.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+          <button
+            onClick={toggleAutoDriveTour}
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-bold text-xs transition-all shadow-sm ${
+              isAutoTouring
+                ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100'
+            }`}
+          >
+            {isAutoTouring ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            <span>{isAutoTouring ? 'Pause Tour' : 'Auto-Drive Full Route 🚀'}</span>
+          </button>
+
           <button
             onClick={handleResetRouteDemo}
             title="Reset route stops for demo"
@@ -295,20 +405,22 @@ export const OptimizedRoutePage: React.FC = () => {
           </div>
         </div>
 
-        {nextTargetStop ? (
-          <button
-            onClick={() => handleMarkStopCollected(nextTargetStop._id)}
-            className="w-full md:w-auto px-6 py-3 rounded-2xl font-bold text-sm bg-white text-emerald-900 hover:bg-emerald-50 active:scale-95 shadow-lg shadow-black/20 flex items-center justify-center gap-2 shrink-0 transition-all"
-          >
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Collect & Move to Next Location →</span>
-          </button>
-        ) : (
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Route Finished</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {nextTargetStop ? (
+            <button
+              onClick={() => handleMarkStopCollected(nextTargetStop._id)}
+              className="w-full md:w-auto px-6 py-3 rounded-2xl font-bold text-sm bg-white text-emerald-900 hover:bg-emerald-50 active:scale-95 shadow-lg shadow-black/20 flex items-center justify-center gap-2 shrink-0 transition-all"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Collect & Move to Next Location →</span>
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Route Finished</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Route KPI Metrics */}
@@ -382,16 +494,26 @@ export const OptimizedRoutePage: React.FC = () => {
 
             <div className="overflow-y-auto max-h-[500px] divide-y divide-gray-100 dark:divide-gray-800/60 pr-1 mt-2 space-y-1">
               {/* Depot Start Point */}
-              <div className="py-3 px-3 rounded-2xl bg-gray-50/60 dark:bg-gray-800/40 flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                  0
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-gray-900 dark:text-white">
-                    Municipal Depot (Start Hub)
+              <div className="py-3 px-3 rounded-2xl bg-gray-50/60 dark:bg-gray-800/40 flex items-center justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-6 h-6 rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                    0
                   </div>
-                  <div className="text-[11px] text-gray-400">Ripon Building, Chennai</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                      Municipal Depot (Start Hub)
+                    </div>
+                    <div className="text-[11px] text-gray-400 truncate">Ripon Building, Chennai</div>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => handleDriveToLocation(depot.lat, depot.lng, 'Municipal Depot', depot.address)}
+                  title="Move van back to Municipal Depot"
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 hover:text-emerald-700 transition-colors shrink-0"
+                >
+                  Drive Here 🏢
+                </button>
               </div>
 
               {pickupStops.length === 0 ? (
@@ -447,12 +569,32 @@ export const OptimizedRoutePage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Action */}
-                      <div className="shrink-0 self-center">
+                      {/* Actions */}
+                      <div className="shrink-0 flex items-center gap-1.5 self-center">
+                        {/* Direct Drive Here Button */}
+                        <button
+                          onClick={() =>
+                            handleDriveToLocation(
+                              stop.location.lat,
+                              stop.location.lng,
+                              `Stop #${idx + 1}`,
+                              stop.location.address
+                            )
+                          }
+                          title={`Drive van directly to Stop #${idx + 1}`}
+                          className="p-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 text-gray-600 dark:text-gray-300 hover:text-emerald-600 border border-gray-200 dark:border-gray-700 transition-colors"
+                        >
+                          <Truck className="w-3.5 h-3.5" />
+                        </button>
+
                         {!isCollected ? (
                           <button
                             onClick={() => handleMarkStopCollected(stop._id)}
-                            title={isCurrentActive ? 'Collect Waste & Move to Next Location' : 'Mark Stop as Collected'}
+                            title={
+                              isCurrentActive
+                                ? 'Collect Waste & Move Van to Next Location'
+                                : 'Mark Stop as Collected'
+                            }
                             className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
                               isCurrentActive
                                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 active:scale-95'
@@ -460,7 +602,7 @@ export const OptimizedRoutePage: React.FC = () => {
                             }`}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{isCurrentActive ? 'Collect' : 'Collect'}</span>
+                            <span>Collect</span>
                           </button>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/40">
