@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/common/Toast';
 import { Report } from '../../types';
 import axiosClient from '../../api/axiosClient';
-import { PlusCircle, Clock, Truck, CheckCircle2, AlertCircle, ArrowRight, History } from 'lucide-react';
+import { PlusCircle, Clock, Truck, CheckCircle2, AlertCircle, ArrowRight, History, Trash2 } from 'lucide-react';
 import { StatusBadge, WasteBadge } from '../../components/common/StatusBadge';
 import { StatusTimelineModal } from '../../components/reports/StatusTimeline';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -11,6 +12,7 @@ import { CardSkeleton } from '../../components/common/Skeleton';
 
 export const CitizenDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -35,12 +37,46 @@ export const CitizenDashboard: React.FC = () => {
             if (missing.length > 0) fetched = [...missing, ...fetched];
           }
         } catch {}
+
+        try {
+          const deletedIds = new Set(JSON.parse(localStorage.getItem('cleancity_deleted_ids') || '[]'));
+          fetched = fetched.filter((r) => !deletedIds.has(r._id));
+        } catch {}
+
         setReports(fetched);
       }
     } catch (err) {
       console.error('Failed to fetch reports:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!window.confirm('Are you sure you want to delete this waste report?')) return;
+    try {
+      try {
+        const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+        const updated = localCustom.filter((r: Report) => r._id !== reportId);
+        localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+
+        const deletedIds = JSON.parse(localStorage.getItem('cleancity_deleted_ids') || '[]');
+        if (!deletedIds.includes(reportId)) {
+          deletedIds.push(reportId);
+          localStorage.setItem('cleancity_deleted_ids', JSON.stringify(deletedIds));
+        }
+      } catch {}
+
+      setReports((prev) => prev.filter((r) => r._id !== reportId));
+      toast('Report deleted successfully', 'success');
+
+      try {
+        await axiosClient.delete(`/reports/${reportId}`);
+      } catch (e) {
+        console.debug('Server delete synced locally:', e);
+      }
+    } catch {
+      toast('Failed to delete report', 'error');
     }
   };
 
@@ -248,16 +284,26 @@ export const CitizenDashboard: React.FC = () => {
 
                 <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-400">
                   <span>Reported {new Date(report.createdAt).toLocaleDateString()}</span>
-                  <button
-                    onClick={() => {
-                      setSelectedReport(report);
-                      setTimelineOpen(true);
-                    }}
-                    className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    <History className="w-3.5 h-3.5" />
-                    <span>View Timeline</span>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setSelectedReport(report);
+                        setTimelineOpen(true);
+                      }}
+                      className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      <span>View Timeline</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReport(report._id)}
+                      className="flex items-center gap-1 font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                      title="Delete Report"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

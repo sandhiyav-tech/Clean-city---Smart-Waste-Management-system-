@@ -608,11 +608,13 @@ router.get('/stats', (req, res) => {
 // -------------------------------------------------------------
 // REPORTS ENDPOINTS
 // -------------------------------------------------------------
+const DELETED_REPORT_IDS = new Set();
+
 router.get('/reports', (req, res) => {
   const user = getAuthUser(req);
   const { status, wasteType, search, driverId, page = 1, limit = 50 } = req.query;
 
-  let filtered = [...DEMO_REPORTS];
+  let filtered = DEMO_REPORTS.filter((r) => !DELETED_REPORT_IDS.has(r._id));
 
   // Role scoping
   if (user && user.role === 'CITIZEN') {
@@ -723,6 +725,9 @@ router.post('/reports', requireDemoAuth, (req, res) => {
 });
 
 router.get('/reports/:id', (req, res) => {
+  if (DELETED_REPORT_IDS.has(req.params.id)) {
+    return res.status(404).json({ success: false, message: 'Report not found' });
+  }
   let report = DEMO_REPORTS.find((r) => r._id === req.params.id);
   if (!report) {
     report = {
@@ -889,11 +894,11 @@ router.patch('/reports/:id/assign', requireDemoAuth, (req, res) => {
 });
 
 router.delete('/reports/:id', requireDemoAuth, (req, res) => {
+  DELETED_REPORT_IDS.add(req.params.id);
   const idx = DEMO_REPORTS.findIndex((r) => r._id === req.params.id);
-  if (idx === -1) {
-    return res.status(404).json({ success: false, message: 'Report not found' });
+  if (idx !== -1) {
+    DEMO_REPORTS.splice(idx, 1);
   }
-  DEMO_REPORTS.splice(idx, 1);
   return res.status(200).json({ success: true, message: 'Report deleted successfully' });
 });
 

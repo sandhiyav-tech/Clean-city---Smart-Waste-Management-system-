@@ -63,6 +63,11 @@ export const MyReportsPage: React.FC = () => {
           }
         } catch { }
 
+        try {
+          const deletedIds = new Set(JSON.parse(localStorage.getItem('cleancity_deleted_ids') || '[]'));
+          fetchedReports = fetchedReports.filter((r) => !deletedIds.has(r._id));
+        } catch { }
+
         if (statusFilter !== 'ALL') {
           fetchedReports = fetchedReports.filter((r) => r.status === statusFilter);
         }
