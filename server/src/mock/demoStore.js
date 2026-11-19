@@ -977,6 +977,32 @@ router.get('/users/drivers', (req, res) => {
   return res.status(200).json({ success: true, data: { drivers } });
 });
 
+router.post('/users', requireDemoAuth, (req, res) => {
+  const { name, email, phone, role = 'CITIZEN' } = req.body || {};
+  if (!name || !email) {
+    return res.status(400).json({ success: false, message: 'Name and email are required' });
+  }
+  const cleanEmail = email.toLowerCase().trim();
+  let user = DEMO_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
+  if (!user) {
+    user = {
+      _id: `64a00000000000000000${String(DEMO_USERS.length + 1).padStart(4, '0')}`,
+      name,
+      email: cleanEmail,
+      phone: phone || '+91 98400 11223',
+      role,
+      createdAt: new Date(),
+    };
+    DEMO_USERS.unshift(user);
+  } else {
+    user.name = name;
+    user.role = role;
+    if (phone) user.phone = phone;
+  }
+  const { passwordHash, ...safeUser } = user;
+  return res.status(201).json({ success: true, message: 'User added successfully', data: { user: safeUser } });
+});
+
 router.patch('/users/:id/role', requireDemoAuth, (req, res) => {
   const { role } = req.body;
   const user = DEMO_USERS.find((u) => u._id === req.params.id);

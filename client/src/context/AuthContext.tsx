@@ -29,8 +29,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await axiosClient.get('/auth/me');
       if (res.data?.success && res.data.data?.user) {
-        setUser(res.data.data.user);
-        localStorage.setItem('cleancity_user', JSON.stringify(res.data.data.user));
+        const u = res.data.data.user;
+        setUser(u);
+        localStorage.setItem('cleancity_user', JSON.stringify(u));
+        try {
+          const registered = JSON.parse(localStorage.getItem('cleancity_registered_users') || '[]');
+          if (!registered.some((reg: any) => reg.email?.toLowerCase() === u.email?.toLowerCase())) {
+            registered.unshift(u);
+            localStorage.setItem('cleancity_registered_users', JSON.stringify(registered));
+          }
+        } catch {}
       } else {
         localStorage.removeItem('cleancity_token');
         localStorage.removeItem('cleancity_user');
@@ -59,6 +67,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       localStorage.setItem('cleancity_token', token);
       localStorage.setItem('cleancity_user', JSON.stringify(loggedUser));
+      try {
+        const registered = JSON.parse(localStorage.getItem('cleancity_registered_users') || '[]');
+        if (!registered.some((reg: any) => reg.email?.toLowerCase() === loggedUser.email?.toLowerCase())) {
+          registered.unshift(loggedUser);
+          localStorage.setItem('cleancity_registered_users', JSON.stringify(registered));
+        }
+      } catch {}
     }
     setUser(loggedUser);
     return loggedUser;
@@ -77,6 +92,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       localStorage.setItem('cleancity_token', token);
       localStorage.setItem('cleancity_user', JSON.stringify(newUser));
+      try {
+        const registered = JSON.parse(localStorage.getItem('cleancity_registered_users') || '[]');
+        if (!registered.some((reg: any) => reg.email?.toLowerCase() === newUser.email?.toLowerCase())) {
+          registered.unshift(newUser);
+          localStorage.setItem('cleancity_registered_users', JSON.stringify(registered));
+        }
+      } catch {}
     }
     setUser(newUser);
     return newUser;
