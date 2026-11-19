@@ -26,6 +26,23 @@ export const BroadcastPage: React.FC = () => {
         type,
       });
 
+      try {
+        const notif = {
+          _id: res.data?.data?.notification?._id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          user: null,
+          targetRole,
+          title: targetRole === 'CITIZEN' ? 'Citizen Alert' : targetRole === 'DRIVER' ? 'Fleet Alert' : 'Municipal Announcement',
+          message: message.trim(),
+          type: 'BROADCAST',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        };
+        const localNotifs = JSON.parse(localStorage.getItem('cleancity_local_notifications') || '[]');
+        localNotifs.unshift(notif);
+        localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
+        window.dispatchEvent(new Event('cleancity_notification_updated'));
+      } catch {}
+
       toast(res.data?.message || 'Notification broadcasted successfully!', 'success');
       setLastBroadcast(message.trim());
       setMessage('');

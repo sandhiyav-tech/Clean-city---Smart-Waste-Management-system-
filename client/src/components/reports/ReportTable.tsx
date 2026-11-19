@@ -85,6 +85,23 @@ export const ReportTable: React.FC<ReportTableProps> = ({
             : r
         );
         localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+
+        const assignedDriverObj = drivers.find((d) => d._id === selectedDriverId);
+        const notif = {
+          _id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          user: reportToAssign.user?._id || null,
+          targetRole: 'CITIZEN',
+          title: 'Driver Assigned for Pickup',
+          message: `Driver ${assignedDriverObj?.name || 'Assigned Driver'} has been dispatched for your report "${reportToAssign.title}".`,
+          type: 'ASSIGNMENT',
+          reportId: reportToAssign._id,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        };
+        const localNotifs = JSON.parse(localStorage.getItem('cleancity_local_notifications') || '[]');
+        localNotifs.unshift(notif);
+        localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
+        window.dispatchEvent(new Event('cleancity_notification_updated'));
       } catch {}
       toast('Driver assigned successfully!', 'success');
       setAssignModalOpen(false);
@@ -118,6 +135,25 @@ export const ReportTable: React.FC<ReportTableProps> = ({
           r._id === reportToUpdate._id ? { ...r, status: newStatus } : r
         );
         localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+
+        const notif = {
+          _id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          user: reportToUpdate.user?._id || null,
+          targetRole: 'CITIZEN',
+          title: newStatus === 'COLLECTED' ? 'Waste Collected & Cleared' : `Report Status: ${newStatus}`,
+          message:
+            newStatus === 'COLLECTED'
+              ? `Waste Collected! Your report "${reportToUpdate.title}" has been successfully collected and cleared! Thank you for keeping Chennai clean.`
+              : `Your waste report "${reportToUpdate.title}" has been updated to ${newStatus}.`,
+          type: 'STATUS_UPDATE',
+          reportId: reportToUpdate._id,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        };
+        const localNotifs = JSON.parse(localStorage.getItem('cleancity_local_notifications') || '[]');
+        localNotifs.unshift(notif);
+        localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
+        window.dispatchEvent(new Event('cleancity_notification_updated'));
       } catch {}
       toast(`Status updated to ${newStatus}`, 'success');
       setStatusModalOpen(false);

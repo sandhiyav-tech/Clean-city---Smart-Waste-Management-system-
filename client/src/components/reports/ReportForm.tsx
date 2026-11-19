@@ -109,6 +109,23 @@ export const ReportForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) 
           const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
           localCustom.unshift(res.data.data.report);
           localStorage.setItem('cleancity_local_reports', JSON.stringify(localCustom));
+
+          // Create notification for citizen
+          const notif = {
+            _id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            user: res.data.data.report.user?._id || 'CITIZEN',
+            targetRole: 'CITIZEN',
+            title: 'Report Submitted',
+            message: `Your waste report "${payload.title}" has been registered successfully and is pending municipal review.`,
+            type: 'STATUS_UPDATE',
+            reportId: res.data.data.report._id,
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          };
+          const localNotifs = JSON.parse(localStorage.getItem('cleancity_local_notifications') || '[]');
+          localNotifs.unshift(notif);
+          localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
+          window.dispatchEvent(new Event('cleancity_notification_updated'));
         } catch { }
       }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Recycle,
@@ -15,10 +15,16 @@ import {
   Radio,
   Navigation,
   CheckCheck,
+  CheckCircle2,
+  Truck,
+  Clock,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { NotificationItem } from '../../types';
 
 export const Navbar: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -26,8 +32,27 @@ export const Navbar: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const notifDropdownRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Close notifications dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        notifDropdownRef.current &&
+        !notifDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showNotifications]);
 
   const handleLogout = async () => {
     await logout();
@@ -124,7 +149,7 @@ export const Navbar: React.FC = () => {
 
             {/* Notification Bell (Authenticated only) */}
             {isAuthenticated && (
-              <div className="relative">
+              <div className="relative" ref={notifDropdownRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   aria-label="Notifications"
@@ -132,7 +157,7 @@ export const Navbar: React.FC = () => {
                 >
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full animate-bounce">
+                    <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full animate-bounce shadow-sm">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -141,7 +166,7 @@ export const Navbar: React.FC = () => {
                 {/* Notifications Dropdown */}
                 {showNotifications && (
                   <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 py-3 z-50 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center justify-between px-4 pb-2.5 border-b border-gray-100 dark:border-gray-800">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-gray-900 dark:text-white">Notifications</span>
                         {unreadCount > 0 && (
@@ -153,7 +178,7 @@ export const Navbar: React.FC = () => {
                       {unreadCount > 0 && (
                         <button
                           onClick={() => markAllAsRead()}
-                          className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+                          className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
                         >
                           <CheckCheck className="w-3.5 h-3.5" /> Mark all read
                         </button>
@@ -162,32 +187,88 @@ export const Navbar: React.FC = () => {
 
                     <div className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800/50">
                       {notifications.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                          No notifications yet.
+                        <div className="p-8 text-center text-sm text-gray-400 dark:text-gray-500 flex flex-col items-center gap-2">
+                          <CheckCircle2 className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                          <span>All caught up! No notifications yet.</span>
                         </div>
                       ) : (
-                        notifications.slice(0, 10).map((n) => (
-                          <div
-                            key={n._id}
-                            onClick={() => !n.isRead && markAsRead(n._id)}
-                            className={`p-3 text-xs sm:text-sm cursor-pointer transition-colors ${
-                              !n.isRead
-                                ? 'bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/40 text-gray-600 dark:text-gray-400'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="font-medium text-gray-900 dark:text-gray-100">{n.message}</span>
-                              {!n.isRead && (
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
-                              )}
+                        notifications.slice(0, 15).map((n) => {
+                          const isCollected =
+                            n.message.toLowerCase().includes('collected') ||
+                            n.message.toLowerCase().includes('cleared') ||
+                            n.title?.toLowerCase().includes('collected');
+                          const isAssignment =
+                            n.type === 'ASSIGNMENT' ||
+                            n.message.toLowerCase().includes('assigned');
+                          const isBroadcast =
+                            n.type === 'BROADCAST' ||
+                            n.title?.toLowerCase().includes('broadcast') ||
+                            n.title?.toLowerCase().includes('drive');
+
+                          return (
+                            <div
+                              key={n._id}
+                              onClick={() => {
+                                markAsRead(n._id);
+                                setShowNotifications(false);
+                                if (user?.role === 'CITIZEN') {
+                                  navigate('/citizen/reports');
+                                } else if (user?.role === 'DRIVER') {
+                                  navigate('/driver/tasks');
+                                } else if (user?.role === 'ADMIN') {
+                                  navigate('/admin/reports');
+                                }
+                              }}
+                              className={`p-3.5 text-xs sm:text-sm cursor-pointer transition-colors flex items-start gap-3 ${
+                                !n.isRead
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50'
+                                  : 'hover:bg-gray-50 dark:hover:bg-gray-800/40 text-gray-600 dark:text-gray-400'
+                              }`}
+                            >
+                              {/* Icon */}
+                              <div
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                                  isCollected
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400'
+                                    : isAssignment
+                                    ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400'
+                                    : isBroadcast
+                                    ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-400'
+                                    : 'bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-400'
+                                }`}
+                              >
+                                {isCollected ? (
+                                  <CheckCircle2 className="w-4 h-4" />
+                                ) : isAssignment ? (
+                                  <Truck className="w-4 h-4" />
+                                ) : isBroadcast ? (
+                                  <Radio className="w-4 h-4" />
+                                ) : (
+                                  <Clock className="w-4 h-4" />
+                                )}
+                              </div>
+
+                              {/* Body */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <span className="font-bold text-xs text-gray-900 dark:text-gray-100 truncate">
+                                    {n.title || (isBroadcast ? 'City Announcement' : isCollected ? 'Collection Update' : 'CleanCity Update')}
+                                  </span>
+                                  {!n.isRead && (
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed">
+                                  {n.message}
+                                </p>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 block font-medium">
+                                  {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
+                                  {new Date(n.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 block">
-                              {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
-                              {new Date(n.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

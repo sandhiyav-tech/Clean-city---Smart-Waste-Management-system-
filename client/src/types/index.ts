@@ -60,13 +60,15 @@ export interface Report {
 export interface NotificationItem {
   _id: string;
   user?: string | null;
+  title?: string;
   message: string;
-  type: 'STATUS_UPDATE' | 'ASSIGNMENT' | 'BROADCAST' | 'SYSTEM';
+  type: 'STATUS_UPDATE' | 'ASSIGNMENT' | 'BROADCAST' | 'SYSTEM' | string;
+  targetRole?: string;
   reportId?: {
     _id: string;
     title: string;
     status: ReportStatus;
-  } | null;
+  } | string | null;
   isRead: boolean;
   createdAt: string;
 }

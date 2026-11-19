@@ -48,6 +48,33 @@ export const DriverTasksPage: React.FC = () => {
         status: newStatus,
         note: `Updated by driver to ${newStatus}`,
       });
+      try {
+        const localCustom = JSON.parse(localStorage.getItem('cleancity_local_reports') || '[]');
+        const updated = localCustom.map((r: any) =>
+          r._id === reportId ? { ...r, status: newStatus } : r
+        );
+        localStorage.setItem('cleancity_local_reports', JSON.stringify(updated));
+
+        const targetTask = tasks.find((t) => t._id === reportId);
+        const notif = {
+          _id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          user: targetTask?.user?._id || null,
+          targetRole: 'CITIZEN',
+          title: newStatus === 'COLLECTED' ? 'Waste Collected & Cleared' : `Pickup ${newStatus}`,
+          message:
+            newStatus === 'COLLECTED'
+              ? `Waste Collected! Your report "${targetTask?.title || 'Report'}" has been successfully collected and cleared! Thank you.`
+              : `Driver is en route to collect your report "${targetTask?.title || 'Report'}".`,
+          type: 'STATUS_UPDATE',
+          reportId,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        };
+        const localNotifs = JSON.parse(localStorage.getItem('cleancity_local_notifications') || '[]');
+        localNotifs.unshift(notif);
+        localStorage.setItem('cleancity_local_notifications', JSON.stringify(localNotifs.slice(0, 50)));
+        window.dispatchEvent(new Event('cleancity_notification_updated'));
+      } catch {}
       toast(`Pickup stop marked as ${newStatus}!`, 'success');
       setTasks((prev) =>
         prev.map((t) => (t._id === reportId ? { ...t, status: newStatus } : t))

@@ -61,7 +61,7 @@ export const MyReportsPage: React.FC = () => {
               fetchedReports = [...missing, ...fetchedReports];
             }
           }
-        } catch {}
+        } catch { }
 
         if (statusFilter !== 'ALL') {
           fetchedReports = fetchedReports.filter((r) => r.status === statusFilter);
@@ -113,11 +113,10 @@ export const MyReportsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => handleStatusFilterChange('ALL')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-            statusFilter === 'ALL'
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${statusFilter === 'ALL'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
               : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800'
-          }`}
+            }`}
         >
           <Layers className="w-3.5 h-3.5" />
           <span>All Reports</span>
@@ -126,11 +125,10 @@ export const MyReportsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => handleStatusFilterChange('COLLECTED')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-            statusFilter === 'COLLECTED'
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${statusFilter === 'COLLECTED'
               ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
               : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800'
-          }`}
+            }`}
         >
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
           <span>Collected & Resolved</span>
@@ -139,11 +137,10 @@ export const MyReportsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => handleStatusFilterChange('IN_PROGRESS')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-            statusFilter === 'IN_PROGRESS'
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${statusFilter === 'IN_PROGRESS'
               ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
               : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 border border-blue-200 dark:border-blue-800'
-          }`}
+            }`}
         >
           <Truck className="w-3.5 h-3.5 text-blue-500" />
           <span>In Progress</span>
@@ -152,11 +149,10 @@ export const MyReportsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => handleStatusFilterChange('PENDING')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-            statusFilter === 'PENDING'
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 ${statusFilter === 'PENDING'
               ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
               : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800'
-          }`}
+            }`}
         >
           <Clock className="w-3.5 h-3.5 text-amber-500" />
           <span>Pending Review</span>

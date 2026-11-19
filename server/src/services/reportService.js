@@ -20,6 +20,18 @@ async function createReport({ user, title, description, imageUrl, location, wast
     ],
   });
 
+  // Notify citizen of successful submission
+  try {
+    await createNotification({
+      user,
+      message: `Your report "${title}" has been registered successfully and is pending review.`,
+      type: 'STATUS_UPDATE',
+      reportId: report._id,
+    });
+  } catch (err) {
+    console.error('Failed to notify citizen of report creation:', err);
+  }
+
   return report;
 }
 

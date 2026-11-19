@@ -310,34 +310,119 @@ const DEMO_REPORTS = RAW_REPORTS.map((item, idx) => {
 
 // Demo Notifications
 const DEMO_NOTIFICATIONS = [
+  // 1. Citizen notifications (DEMO_USERS[2] is citizen@cleancity.com)
   {
     _id: '64c000000000000000000001',
-    user: DEMO_USERS[0]._id,
-    title: 'New Waste Report Registered',
-    message: 'A citizen reported plastic waste at Marina Beach Promenade.',
-    type: 'REPORT_SUBMITTED',
+    user: '64a000000000000000000003', // Citizen Ananya
+    targetRole: 'CITIZEN',
+    title: 'Waste Collected & Cleared',
+    message: 'Your report "Collected dry leaves and park debris cleared" at Adyar River Park Walkway has been successfully collected and cleared! Thank you.',
+    type: 'STATUS_UPDATE',
+    reportId: { _id: '64b000000000000000000004', title: 'Collected dry leaves and park debris cleared', status: 'COLLECTED' },
     read: false,
-    createdAt: new Date(Date.now() - 3600000),
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 1800000), // 30 mins ago
   },
   {
     _id: '64c000000000000000000002',
-    user: DEMO_USERS[1]._id,
-    title: 'New Pickup Task Assigned',
-    message: 'You have been assigned to collect organic waste at Ranganathan Street.',
-    type: 'TASK_ASSIGNED',
+    user: '64a000000000000000000003', // Citizen Ananya
+    targetRole: 'CITIZEN',
+    title: 'Driver Assigned for Pickup',
+    message: 'Driver Karthik Raja has been dispatched to collect your report "Plastic bottles and beverage cartons".',
+    type: 'ASSIGNMENT',
+    reportId: { _id: '64b000000000000000000002', title: 'Plastic bottles and beverage cartons', status: 'ASSIGNED' },
     read: false,
-    createdAt: new Date(Date.now() - 7200000),
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 7200000), // 2 hrs ago
   },
   {
     _id: '64c000000000000000000003',
-    user: DEMO_USERS[2]._id,
-    title: 'Report Update: In Progress',
-    message: 'Your report regarding computer monitors on OMR Road is currently being collected.',
-    type: 'STATUS_UPDATED',
-    read: true,
-    createdAt: new Date(Date.now() - 14400000),
+    user: null, // Broadcast to all
+    targetRole: 'ALL',
+    title: 'Citywide Cleanliness Drive',
+    message: 'Greater Chennai Corporation has initiated a zero-plastic zone across Marina & Besant Nagar beaches. Report unattended waste 24/7.',
+    type: 'BROADCAST',
+    reportId: null,
+    read: false,
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 14400000), // 4 hrs ago
+  },
+  // 2. Driver notifications (DEMO_USERS[1] is driver@cleancity.com)
+  {
+    _id: '64c000000000000000000004',
+    user: '64a000000000000000000002', // Driver Karthik
+    targetRole: 'DRIVER',
+    title: 'New Pickup Task Assigned',
+    message: 'You have been assigned to collect organic waste at Ranganathan Street, T. Nagar.',
+    type: 'ASSIGNMENT',
+    reportId: { _id: '64b000000000000000000001', title: 'Overflowing vegetable waste bins', status: 'ASSIGNED' },
+    read: false,
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 3600000), // 1 hr ago
+  },
+  {
+    _id: '64c000000000000000000005',
+    user: '64a000000000000000000002', // Driver Karthik
+    targetRole: 'DRIVER',
+    title: 'Route Optimization Complete',
+    message: 'Your dynamic daily pickup route has been calculated: 5 collection stops arranged for optimal travel distance.',
+    type: 'SYSTEM',
+    reportId: null,
+    read: false,
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 10800000), // 3 hrs ago
+  },
+  // 3. Admin notifications (DEMO_USERS[0] is admin@cleancity.com)
+  {
+    _id: '64c000000000000000000006',
+    user: '64a000000000000000000001', // Admin
+    targetRole: 'ADMIN',
+    title: 'New Waste Report Registered',
+    message: 'A citizen reported plastic waste at Marina Beach Promenade.',
+    type: 'STATUS_UPDATE',
+    reportId: { _id: '64b000000000000000000002', title: 'Plastic bottles and beverage cartons', status: 'ASSIGNED' },
+    read: false,
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 5400000), // 1.5 hrs ago
+  },
+  {
+    _id: '64c000000000000000000007',
+    user: '64a000000000000000000001', // Admin
+    targetRole: 'ADMIN',
+    title: 'Collection Verified',
+    message: 'Driver Karthik Raja marked report #0004 at Adyar River Park Walkway as COLLECTED.',
+    type: 'STATUS_UPDATE',
+    reportId: { _id: '64b000000000000000000004', title: 'Collected dry leaves and park debris cleared', status: 'COLLECTED' },
+    read: false,
+    isRead: false,
+    readBy: [],
+    createdAt: new Date(Date.now() - 1800000), // 30 mins ago
   },
 ];
+
+function addDemoNotification({ user = null, title, message, type = 'STATUS_UPDATE', reportId = null, targetRole = 'ALL' }) {
+  const notif = {
+    _id: `64c00000000000000000${String(DEMO_NOTIFICATIONS.length + 1).padStart(4, '0')}`,
+    user: user || null,
+    targetRole: targetRole || 'ALL',
+    title: title || 'CleanCity Update',
+    message: message || '',
+    type,
+    reportId: reportId ? (typeof reportId === 'object' ? reportId : { _id: reportId, title: title || 'Waste Report', status: 'COLLECTED' }) : null,
+    isRead: false,
+    read: false,
+    readBy: [],
+    createdAt: new Date(),
+  };
+  DEMO_NOTIFICATIONS.unshift(notif);
+  return notif;
+}
 
 // Helper: Extract authenticated user from request
 function getAuthUser(req) {
@@ -610,6 +695,26 @@ router.post('/reports', requireDemoAuth, (req, res) => {
 
   DEMO_REPORTS.unshift(newReport);
 
+  // Notify citizen that report was submitted
+  addDemoNotification({
+    user: req.user._id,
+    targetRole: 'CITIZEN',
+    title: 'Report Submitted',
+    message: `Your waste report "${newReport.title}" has been registered successfully and is pending municipal review.`,
+    type: 'STATUS_UPDATE',
+    reportId: newReport._id,
+  });
+
+  // Notify admin that new report is submitted
+  addDemoNotification({
+    user: DEMO_USERS[0]._id, // Admin
+    targetRole: 'ADMIN',
+    title: 'New Citizen Waste Report',
+    message: `New ${newReport.wasteType} report from ${req.user.name}: "${newReport.title}" at ${newReport.location.address}.`,
+    type: 'STATUS_UPDATE',
+    reportId: newReport._id,
+  });
+
   return res.status(201).json({
     success: true,
     message: 'Waste report created successfully',
@@ -677,6 +782,38 @@ router.patch('/reports/:id/status', requireDemoAuth, (req, res) => {
     note: note || `Status updated to ${status}`,
   });
 
+  // Notify citizen of the status change
+  const citizenId = report.user?._id || report.user;
+  const statusTexts = {
+    PENDING: `Your waste report "${report.title}" is marked as pending review.`,
+    ASSIGNED: `Your waste report "${report.title}" has been assigned for pickup.`,
+    IN_PROGRESS: `Pickup in progress! Driver is currently en route to collect "${report.title}".`,
+    COLLECTED: `Waste Collected! Your report "${report.title}" has been successfully collected and cleared! Thank you for keeping Chennai clean.`,
+  };
+
+  if (citizenId) {
+    addDemoNotification({
+      user: citizenId,
+      targetRole: 'CITIZEN',
+      title: status === 'COLLECTED' ? 'Waste Collected & Cleared' : `Report Status: ${status}`,
+      message: statusTexts[status] || `Your report "${report.title}" status was updated to ${status}.`,
+      type: 'STATUS_UPDATE',
+      reportId: report._id,
+    });
+  }
+
+  // If collected, also notify admin of resolution
+  if (status === 'COLLECTED') {
+    addDemoNotification({
+      user: DEMO_USERS[0]._id,
+      targetRole: 'ADMIN',
+      title: 'Collection Completed',
+      message: `Report "${report.title}" at ${report.location?.address || 'Chennai'} was verified as COLLECTED.`,
+      type: 'STATUS_UPDATE',
+      reportId: report._id,
+    });
+  }
+
   return res.status(200).json({
     success: true,
     message: `Report status updated to ${status}`,
@@ -720,6 +857,29 @@ router.patch('/reports/:id/assign', requireDemoAuth, (req, res) => {
     at: new Date(),
     note: `Assigned to driver ${driver.name}`,
   });
+
+  // Notify assigned driver
+  addDemoNotification({
+    user: driver._id,
+    targetRole: 'DRIVER',
+    title: 'New Pickup Task Assigned',
+    message: `You have been assigned to collect "${report.title}" at ${report.location?.address || 'Chennai'}.`,
+    type: 'ASSIGNMENT',
+    reportId: report._id,
+  });
+
+  // Notify citizen that driver is assigned
+  const citizenIdAssign = report.user?._id || report.user;
+  if (citizenIdAssign) {
+    addDemoNotification({
+      user: citizenIdAssign,
+      targetRole: 'CITIZEN',
+      title: 'Driver Assigned for Pickup',
+      message: `Driver ${driver.name} has been assigned to pick up your waste report "${report.title}".`,
+      type: 'STATUS_UPDATE',
+      reportId: report._id,
+    });
+  }
 
   return res.status(200).json({
     success: true,
@@ -844,29 +1004,55 @@ router.post('/users/broadcast', requireDemoAuth, (req, res) => {
 // NOTIFICATIONS ENDPOINTS
 // -------------------------------------------------------------
 router.get('/notifications', requireDemoAuth, (req, res) => {
-  const userNotifs = DEMO_NOTIFICATIONS.filter((n) => n.user === req.user._id || n.type === 'BROADCAST');
+  const userId = req.user._id;
+  const userRole = req.user.role;
+
+  const userNotifs = DEMO_NOTIFICATIONS.filter((n) => {
+    // 1. Direct user match
+    if (n.user && (n.user === userId || n.user === req.user.email)) return true;
+    // 2. Broadcasts or global notices
+    if (!n.user || n.type === 'BROADCAST') {
+      if (!n.targetRole || n.targetRole === 'ALL' || n.targetRole === userRole) {
+        return true;
+      }
+    }
+    // 3. Fallback for role-targeted notifications
+    if (n.targetRole && (n.targetRole === 'ALL' || n.targetRole === userRole)) {
+      return true;
+    }
+    return false;
+  });
+
+  const formatted = userNotifs.map((n) => {
+    const isReadForThisUser = Array.isArray(n.readBy)
+      ? n.readBy.includes(userId)
+      : (n.isRead ?? n.read ?? false);
+    return {
+      ...n,
+      isRead: isReadForThisUser,
+    };
+  });
+
+  const unreadCount = formatted.filter((n) => !n.isRead).length;
+
   return res.status(200).json({
     success: true,
     data: {
-      notifications: userNotifs.map((n) => ({ ...n, isRead: n.isRead ?? n.read ?? false })),
-      unreadCount: userNotifs.filter((n) => !n.isRead && !n.read).length,
+      notifications: formatted,
+      unreadCount,
     },
   });
 });
 
 router.post('/notifications', requireDemoAuth, (req, res) => {
   const { message, targetRole = 'ALL', type = 'BROADCAST', title } = req.body;
-  const notif = {
-    _id: `64c00000000000000000${String(DEMO_NOTIFICATIONS.length + 1).padStart(4, '0')}`,
+  const notif = addDemoNotification({
     user: null,
-    title: title || 'City Notice',
+    targetRole: targetRole || 'ALL',
+    title: title || (targetRole === 'CITIZEN' ? 'Citizen Notice' : targetRole === 'DRIVER' ? 'Fleet Announcement' : 'Municipal Announcement'),
     message: message || '',
-    type,
-    isRead: false,
-    read: false,
-    createdAt: new Date(),
-  };
-  DEMO_NOTIFICATIONS.unshift(notif);
+    type: type || 'BROADCAST',
+  });
   return res.status(201).json({
     success: true,
     message: 'Notification broadcasted successfully',
@@ -875,18 +1061,22 @@ router.post('/notifications', requireDemoAuth, (req, res) => {
 });
 
 router.patch('/notifications/read-all', requireDemoAuth, (req, res) => {
+  const userId = req.user._id;
   DEMO_NOTIFICATIONS.forEach((n) => {
-    if (n.user === req.user._id || n.type === 'BROADCAST') {
-      n.read = true;
-      n.isRead = true;
-    }
+    if (!Array.isArray(n.readBy)) n.readBy = [];
+    if (!n.readBy.includes(userId)) n.readBy.push(userId);
+    n.read = true;
+    n.isRead = true;
   });
   return res.status(200).json({ success: true, message: 'All notifications marked as read' });
 });
 
 router.patch('/notifications/:id/read', requireDemoAuth, (req, res) => {
+  const userId = req.user._id;
   const notif = DEMO_NOTIFICATIONS.find((n) => n._id === req.params.id);
   if (notif) {
+    if (!Array.isArray(notif.readBy)) notif.readBy = [];
+    if (!notif.readBy.includes(userId)) notif.readBy.push(userId);
     notif.read = true;
     notif.isRead = true;
   }
